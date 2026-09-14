@@ -94,6 +94,19 @@ spec:
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- $probes := dict "startupProbe" .Values.probes.startup "livenessProbe" .Values.probes.liveness "readinessProbe" .Values.probes.readiness }}
+          {{- range $probeName, $probeCfg := $probes }}
+          {{- if $probeCfg.enabled }}
+          {{ $probeName }}:
+            httpGet:
+              path: {{ printf "%s%s" (trimSuffix "/" $.Values.config.webserver.basePath) $probeCfg.path }}
+              port: http
+            initialDelaySeconds: {{ $probeCfg.initialDelaySeconds }}
+            periodSeconds: {{ $probeCfg.periodSeconds }}
+            timeoutSeconds: {{ $probeCfg.timeoutSeconds }}
+            failureThreshold: {{ $probeCfg.failureThreshold }}
+          {{- end }}
+          {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
