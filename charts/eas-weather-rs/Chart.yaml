@@ -1,0 +1,6 @@
+apiVersion: v2
+name: eas-weather-rs
+description: Kubernetes deployment of the eas-weather-rs EAS alert microservice
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

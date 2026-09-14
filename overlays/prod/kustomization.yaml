@@ -1,0 +1,35 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: eas-weather-rs-prod
+helmGlobals:
+  chartHome: ../../charts
+helmCharts:
+  - name: eas-weather-rs
+    releaseName: eas-weather-rs
+    namespace: eas-weather-rs-prod
+    valuesInline:
+      image:
+        repository: ghcr.io/shyuen/eas-weather-rs-server
+        tag: prod
+      replicaCount: 2
+      config:
+        logging:
+          format: json
+          traceLevel: info
+      ingress:
+        enabled: true
+        className: nginx
+        annotations:
+          cert-manager.io/cluster-issuer: letsencrypt-prod
+        hosts:
+          - host: eas-weather-rs.example.com
+            paths:
+              - path: /
+                pathType: Prefix
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi

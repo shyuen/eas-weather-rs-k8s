@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eas-weather-rs.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "eas-weather-rs.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "eas-weather-rs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "eas-weather-rs.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "eas-weather-rs.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.config.webserver.shutdownTimeoutSecs | add 15 }}
+      volumes:
+        - name: secrets
+          secret:
+            secretName: {{ .Values.secrets.secretName }}
+      {{- if .Values.migrate.enabled }}
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/eas-weather-rs-migrate"]
+          env:
+            - name: EAS_WEATHER_RS__DATABASE__CONN_URL_FILE
+              value: {{ .Values.secrets.mountPath }}/{{ .Values.secrets.connUrlKey }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: secrets
+              mountPath: {{ .Values.secrets.mountPath }}
+              readOnly: true
+      {{- end }}
+      containers:
+        - name: server
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/eas-weather-rs-server"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: EAS_WEATHER_RS__WEBSERVER__HOSTNAME
+              value: 0.0.0.0
+            - name: EAS_WEATHER_RS__WEBSERVER__PORT
+              value: {{ .Values.service.port | quote }}
+            - name: EAS_WEATHER_RS__WEBSERVER__BASE_PATH
+              value: {{ .Values.config.webserver.basePath | quote }}
+            - name: EAS_WEATHER_RS__WEBSERVER__SHUTDOWN_TIMEOUT_SECS
+              value: {{ .Values.config.webserver.shutdownTimeoutSecs | quote }}
+            - name: EAS_WEATHER_RS__WEBSERVER__DEFAULT_PAGE_LIMIT
+              value: {{ .Values.config.webserver.defaultPageLimit | quote }}
+            - name: EAS_WEATHER_RS__WEBSERVER__PAGE_LIMIT_MAX
+              value: {{ .Values.config.webserver.pageLimitMax | quote }}
+            - name: EAS_WEATHER_RS__WEBSERVER__API_KEY_FILE
+              value: {{ .Values.secrets.mountPath }}/{{ .Values.secrets.apiKeyKey }}
+            - name: EAS_WEATHER_RS__WEBSERVER__JWT_KEY_FILE
+              value: {{ .Values.secrets.mountPath }}/{{ .Values.secrets.jwtKeyKey }}
+            - name: EAS_WEATHER_RS__DATABASE__CONN_URL_FILE
+              value: {{ .Values.secrets.mountPath }}/{{ .Values.secrets.connUrlKey }}
+            - name: EAS_WEATHER_RS__LOGGING__FORMAT
+              value: {{ .Values.config.logging.format | quote }}
+            - name: EAS_WEATHER_RS__LOGGING__TRACE_LEVEL
+              value: {{ .Values.config.logging.traceLevel | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: secrets
+              mountPath: {{ .Values.secrets.mountPath }}
+              readOnly: true

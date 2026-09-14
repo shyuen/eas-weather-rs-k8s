@@ -1,0 +1,70 @@
+replicaCount: 1
+
+image:
+  # Both the server and migrate binaries live in this single image.
+  repository: eas-weather-rs
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+migrate:
+  # Run `eas-weather-rs-migrate` as an init container before the server starts.
+  enabled: true
+
+serviceAccount:
+  create: true
+  name: ""
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Secret file mount. The app reads sensitive config from files (password file paths)
+# rather than env vars, so an existing k8s Secret is mounted as a volume.
+# Create that Secret out-of-band (e.g. External Secrets Operator) with the keys
+# configured below. Example:
+#   kubectl create secret generic eas-weather-rs-secrets \
+#     --from-literal=conn_url=mysql://user:pass@host:3306/eas_weather
+secrets:
+  secretName: eas-weather-rs-secrets
+  connUrlKey: conn_url
+  apiKeyKey: api_key
+  jwtKeyKey: jwt_key
+  mountPath: /etc/eas
+
+# Application configuration, exposed as EAS_WEATHER_RS__<SECTION>__<KEY> env vars.
+# Unset fields fall back to the app's config/default.toml.
+config:
+  logging:
+    format: text
+    traceLevel: info
+  webserver:
+    basePath: /
+    shutdownTimeoutSecs: 5
+    defaultPageLimit: 10
+    pageLimitMax: 100
+
+resources: {}
+
+extraEnv: []
+#  - name: EAS_WEATHER_RS__LOGGING__TRACE_LEVEL
+#    value: debug
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

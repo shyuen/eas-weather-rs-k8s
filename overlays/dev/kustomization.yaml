@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: eas-weather-rs-dev
+helmGlobals:
+  chartHome: ../../charts
+helmCharts:
+  - name: eas-weather-rs
+    releaseName: eas-weather-rs
+    namespace: eas-weather-rs-dev
+    valuesInline:
+      image:
+        repository: ghcr.io/shyuen/eas-weather-rs-server
+        tag: dev
+      replicaCount: 1
+      config:
+        logging:
+          traceLevel: debug
