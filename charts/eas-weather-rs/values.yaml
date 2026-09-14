@@ -59,6 +59,32 @@ config:
     defaultPageLimit: 10
     pageLimitMax: 100
 
+# Kubernetes health probes, pointed at the app's /health/* routes. These need
+# no API key (only /conf/* routes are authenticated). Probe paths are composed
+# under config.webserver.basePath (default / -> /health/startup, etc.).
+probes:
+  startup:
+    enabled: true
+    path: /health/startup
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 30
+  liveness:
+    enabled: true
+    path: /health/liveness
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /health/readiness
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 1
+    failureThreshold: 3
+
 resources: {}
 
 extraEnv: []
