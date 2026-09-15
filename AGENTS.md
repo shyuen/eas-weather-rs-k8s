@@ -73,13 +73,17 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - `--load-restrictor=LoadRestrictionsNone` is **required** for kustomize builds because
   `chartHome` points outside each overlay's root.
 - Image: both `server` and `migrate` binaries live in the same image
-  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). The CD pipeline in the app repo
-  (`.github/workflows/cd.yml`, `workflow_dispatch`) publishes a floating `<env>` tag plus a
-  versioned `<env>-<sha>` tag, then dispatches here so `.github/workflows/bump-image.yaml`
-  overwrites `overlays/<env>/kustomization.yaml` `valuesInline.image.tag` with the versioned
-  tag and pushes to main. The static markers in the overlays (`dev` / `staging` / `prod`) are
-  the initial/default values until the first CD bump. The dispatch requires a PAT with `repo`
+  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). The app repo's `ci.yml` `publish` job (runs
+  on main push; also `workflow_dispatch`) publishes a floating `<env>` tag plus a versioned
+  `<env>-<sha>` tag, then dispatches here so `.github/workflows/bump-image.yaml` overwrites
+  `overlays/<env>/kustomization.yaml` `valuesInline.image.tag` with the versioned tag and
+  pushes to main. The static markers in the overlays (`dev` / `staging` / `prod`) are the
+  initial/default values until the first CD bump. The dispatch requires a PAT with `repo`
   scope in the app repo (`secrets.EWRS_DEPLOY_REPO_PAT`).
+- **Deployment is ArgoCD's job, not this repo's.** There is deliberately no `kubectl
+  apply`/deploy workflow here. ArgoCD watches this repo's `main` and syncs the target overlay
+  (installed out-of-band, e.g. with the kustomize/helm render settings this repo requires).
+  Keeping `main` green (`helm lint` + `kustomize build`) is all that's needed for a release.
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.
