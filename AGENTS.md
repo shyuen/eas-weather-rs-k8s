@@ -7,11 +7,15 @@ EAS alert microservice, using **Helm** (app templating) + **Kustomize** (environ
 
 ```
 charts/eas-weather-rs/
-  Chart.yaml            Chart metadata (name: eas-weather-rs, version 0.1.0)
+  Chart.yaml            Chart metadata (name: eas-weather-rs, version 0.4.0)
   values.yaml           Default chart values; source of truth for config keys
   templates/
     _helpers.tpl        name/fullname/labels/selectorLabels/serviceAccountName helpers
     deployment.yaml     Deployment: migrate init-container + server container
+    configmap.yaml      Renders config.toml (read-only mount; secret file-path refs, no values)
+    service.yaml        ClusterIP Service on port 8080
+    ingress.yaml        Ingress (rendered only if ingress.enabled)
+    serviceaccount.yaml ServiceAccount (rendered only if serviceAccount.create)
     service.yaml        ClusterIP Service on port 8080
     ingress.yaml        Ingress (rendered only if ingress.enabled)
     serviceaccount.yaml ServiceAccount (rendered only if serviceAccount.create)
@@ -31,12 +35,16 @@ overlays/
 - **Secrets are NOT created by these overlays.** An existing k8s Secret
   (`eas-weather-rs-secrets`, name set via `valuesInline.secrets.secretName`) is mounted as a
   file volume read-only at `/etc/eas`. Handle the Secret out-of-band (e.g. External Secrets Operator).
-- The app reads sensitive config from file paths, not env vars. The template wires:
-  - `EAS_WEATHER_RS__WEBSERVER__API_KEY_FILE`
-  - `EAS_WEATHER_RS__WEBSERVER__JWT_KEY_FILE`
-  - `EAS_WEATHER_RS__DATABASE__CONN_URL_FILE`
-- Other app config is passed as `EAS_WEATHER_RS__<SECTION>__<KEY>` env vars, overriding the app's
-  `config/default.toml`. Values come from `values.yaml` `config:` / `extraEnv:`.
+- **Non-secret config lives in a ConfigMap** (`<fullname>-config`) as one rendered `config.toml`,
+  mounted read-only at `/etc/ewrs` and loaded by BOTH the migrate init-container and the server
+  container via `EAS_WEATHER_RS__APP__CONFIG_FILE`. The app merges it section-over-section over its
+  built-in `config/default.toml`, so only keys set in `values.yaml` `config:` override app defaults;
+  the full app config surface (webserver, logging, database) is available with no template changes.
+- **Secrets never enter the ConfigMap.** `database.conn_url_file`, `webserver.api_key_file` and
+  `webserver.jwt_key_file` are file *paths* into the mounted Secret volume (`/etc/eas`), injected
+  into the rendered config from `secrets:` and documented as secret references. The Secret values
+  themselves are read by the app from files under the mountPath.
+- Config precedence in the app: CLI > env vars > config file > default.toml > code defaults.
 
 ## Commands
 
@@ -68,10 +76,13 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.
-- To add a new env var, extend `values.yaml` `config:` and the server container's `env:` block in
-  `deployment.yaml` using the `EAS_WEATHER_RS__SECTION__KEY` pattern; for one-off overrides use `extraEnv`.
+- To add app config, add keys under `values.yaml` `config:` (section = TOML section, key = the
+  app's snake_case TOML key) — no template change is needed; the ConfigMap generator in
+  `templates/configmap.yaml` emits everything. `service.port` feeds `[webserver] port` and the
+  three secret mount file-path keys are injected from `secrets:`. One-off env overrides on the
+  server container use `extraEnv` (`env:`, which beats the config file in app precedence).
 - Health probes are configured via `values.yaml` `probes:` (startup/liveness/readiness, one route each);
-  their `path` is composed under `config.webserver.basePath` in `deployment.yaml`. The app's `/health/*`
+  their `path` is composed under `config.webserver.base_path` in `deployment.yaml`. The app's `/health/*`
   routes require no API key.
 - New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/dev`, set the
   namespace and `valuesInline`.
@@ -82,3 +93,8 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - Run `kustomize build overlays/<env> --enable-helm --load-restrictor=LoadRestrictionsNone` to
   confirm each environment still renders.
 - Namespaces used: `eas-weather-rs-dev`, `eas-weather-rs-prod`.
+
+## Workflow
+
+- **Always commit changes you make** (the user expects a commit per change set). Commit only
+  when the work is verified (see Verification). If asked, push and open a PR on a branch.
