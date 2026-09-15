@@ -15,7 +15,7 @@ helmCharts:
       config:
         logging:
           format: json
-          traceLevel: info
+          trace_level: info
       ingress:
         enabled: true
         className: nginx

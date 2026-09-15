@@ -47,21 +47,39 @@ secrets:
   jwtKeyKey: jwt_key
   mountPath: /etc/eas
 
-# Application configuration, exposed as EAS_WEATHER_RS__<SECTION>__<KEY> env vars.
-# Unset fields fall back to the app's config/default.toml.
+# Application configuration. Rendered to a config.toml ConfigMap, mounted read-only for
+# BOTH the migrate init-container and the server container, and loaded via
+# EAS_WEATHER_RS__APP__CONFIG_FILE. The app merges it section-by-section over its own
+# config/default.toml, so only keys set here override app defaults - the full app config
+# surface (webserver, logging, database) is available without chart template changes.
+# Key names must match the app's config.toml keys (snake_case).
 config:
   logging:
     format: text
-    traceLevel: info
+    trace_level: info
   webserver:
-    basePath: /
-    shutdownTimeoutSecs: 5
-    defaultPageLimit: 10
-    pageLimitMax: 100
+    hostname: "0.0.0.0"
+    base_path: /
+    shutdown_timeout_secs: 5
+    default_page_limit: 10
+    page_limit_max: 100
+  database:
+    conn_retry_init_delay_secs: 1
+    conn_acquire_timeout_secs: 5
+    min_connections: 1
+    max_connections: 151
+
+# Where the rendered config.toml is mounted and how the app is told to load it.
+# Do NOT set webserver.api_key_file / webserver.jwt_key_file / database.conn_url_file in
+# `config:` above - those secret file paths are injected from `secrets:` and only paths
+# (never secret values) end up in the ConfigMap.
+configFile:
+  name: config.toml
+  mountPath: /etc/ewrs
 
 # Kubernetes health probes, pointed at the app's /health/* routes. These need
 # no API key (only /conf/* routes are authenticated). Probe paths are composed
-# under config.webserver.basePath (default / -> /health/startup, etc.).
+# under config.webserver.base_path (default / -> /health/startup, etc.).
 probes:
   startup:
     enabled: true

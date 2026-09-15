@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "eas-weather-rs.fullname" . }}-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "eas-weather-rs.labels" . | nindent 4 }}
+data:
+  # Rendered to config.toml, mounted read-only at {{ .Values.configFile.mountPath }} and
+  # loaded by BOTH containers via EAS_WEATHER_RS__APP__CONFIG_FILE. The app merges it
+  # section-over-section over its built-in config/default.toml, so only keys set here
+  # override app defaults. Everything under `data` comes from values.yaml `config:`.
+  #
+  # Secret references: database.conn_url_file, webserver.api_key_file and
+  # webserver.jwt_key_file are file paths into the "{{ .Values.secrets.secretName }}"
+  # Secret volume ({{ .Values.secrets.mountPath }}), which is NOT created by this chart -
+  # handle it out-of-band (External Secrets Operator, or kubectl create secret).
+  # Expected keys: {{ .Values.secrets.connUrlKey }}, {{ .Values.secrets.apiKeyKey }},
+  # {{ .Values.secrets.jwtKeyKey }}. Only the file paths land in this ConfigMap; the
+  # secret values themselves never do (the app reads them from files under mountPath).
+  config.toml: |-
+    {{- $config := deepCopy .Values.config }}
+    {{- $inject := dict
+        "webserver" (dict
+          "port" (int .Values.service.port)
+          "api_key_file" (printf "%s/%s" .Values.secrets.mountPath .Values.secrets.apiKeyKey)
+          "jwt_key_file" (printf "%s/%s" .Values.secrets.mountPath .Values.secrets.jwtKeyKey))
+        "database" (dict
+          "conn_url_file" (printf "%s/%s" .Values.secrets.mountPath .Values.secrets.connUrlKey))
+    }}
+    {{- $config = mustMergeOverwrite $config $inject }}
+    {{- range $section, $sectionConfig := $config }}
+    {{- printf "\n    [%s]\n" $section }}
+    {{- range $key, $value := $sectionConfig }}
+    {{- $valueStr := $value }}
+    {{- if kindIs "string" $value }}
+    {{- $valueStr = printf "%q" $value }}
+    {{- end }}
+    {{- printf "        %s = %v\n" $key $valueStr }}
+    {{- end }}
+    {{- end }}
