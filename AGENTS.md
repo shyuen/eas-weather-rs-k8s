@@ -87,6 +87,19 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/dev`, set the
   namespace and `valuesInline`.
 
+### Helm values vs Kustomize features (where env differences go)
+
+- If the chart exposes a knob, a per-env difference goes in the overlay's `helmCharts[].valuesInline`
+  (image tag, replicas, logging, probes, resources, ingress). This keeps the chart the single contract
+  and each overlay a readable diff against chart defaults.
+- Use Kustomize-native features only for **non-chart / environment-level** concerns:
+  - `namespace:` (already the pattern) and extra cluster concerns.
+  - `resources:`, `configMapGenerator`/`secretGenerator` for per-env objects the chart doesn't own
+    (note: the app's Secret is deliberately kept out of overlays).
+  - `commonLabels`/`commonAnnotations` for uniform sweeps across all rendered objects.
+  - `patches:` / `images:` / `replicas:` only as a last resort for chart gaps — they depend on the
+    rendered output and silently break if the chart changes. Prefer exposing a new chart value instead.
+
 ## Verification
 
 - Run `helm lint charts/eas-weather-rs` after chart edits.
