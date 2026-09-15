@@ -88,6 +88,8 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
   routes require no API key.
 - The deployment pod template carries a `checksum/config` annotation (hash of the rendered ConfigMap) so a
   config change triggers a rollout; the app reads config once at startup, so a restart is required for changes.
+  Set `reloader.enabled` to also render `reloader.stakater.com/auto` for secret-value rotation (Reloader must
+  be installed cluster-wide, out-of-band).
 - New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/staging`, set the
   namespace and `valuesInline`. The image tag must exist as an environment marker (`dev` / `staging` /
   `prod`) in the app's container registry - build the tag in CI before deploying that environment.

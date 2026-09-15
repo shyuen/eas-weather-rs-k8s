@@ -16,6 +16,9 @@ spec:
         {{- include "eas-weather-rs.selectorLabels" . | nindent 8 }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.reloader.enabled }}
+        reloader.stakater.com/auto: "true"
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
