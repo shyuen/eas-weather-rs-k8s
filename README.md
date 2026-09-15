@@ -44,6 +44,25 @@ kustomize build overlays/prod --enable-helm --load-restrictor=LoadRestrictionsNo
 `--load-restrictor=LoadRestrictionsNone` is required because `helmCharts.chartHome`
 points at the shared `charts/` directory outside each overlay's root.
 
+## Image bumps and deployment
+
+The app repo's `ci.yml` `publish` job (runs on main push; also `workflow_dispatch`) builds
+the image, publishes `<env>` + `<env>-<sha>` tags to GHCR and tags the codebase repo, then
+clones this repo with a PAT (`secrets.EWRS_DEPLOY_REPO_PAT` — `repo` scope), yq-updates
+`overlays/<env>/kustomization.yaml` `valuesInline.image.tag`, and pushes to `main`. The
+static tags in `overlays/*` (`dev`, `staging`, `prod`) are the initial values until the
+first publish.
+
+Deployment is ArgoCD's job: it watches this repo's `main` and syncs the target overlay, so
+there is deliberately no `kubectl apply`/deploy workflow here. `.github/workflows/verify.yaml`
+runs `helm lint` + a full `kustomize build` of every overlay on each push/PR to keep `main`
+green for ArgoCD.
+
+Config-only changes need no pipeline: edit `valuesInline` (env vars, replicas, probes, ...)
+in an overlay, push — verify.yaml renders it, ArgoCD applies it, and the `checksum/config`
+annotation on the pod template rolls the workload. The app repo's CI is only involved when a
+new image tag is being published.
+
 ## Customising an environment
 
 Environment differences (image tag, replicas, logging, ingress, resources) are

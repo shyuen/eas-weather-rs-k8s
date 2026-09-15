@@ -1,0 +1,56 @@
+name: Verify overlays
+
+# Keeps main green: the app repo's ci.yml publish job pushes image-tag bumps
+# straight to main (PAT), so every push and PR is validated here. ArgoCD then
+# deploys whatever main renders.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Helm
+        uses: azure/setup-helm@v4.2.0
+        with:
+          version: latest
+      - name: Install Kustomize
+        run: |
+          KUSTOMIZE_VERSION=v5.8.1
+          curl -sSLo /tmp/kustomize-linux-amd64.tar.gz \
+            "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/kustomize-linux-amd64.tar.gz -C /tmp
+          sudo mv /tmp/kustomize /usr/local/bin/kustomize
+      - name: Install kubeconform
+        run: |
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+      - name: Helm lint
+        run: helm lint charts/eas-weather-rs
+      - name: Render and schema-validate the chart for every overlay
+        run: |
+          {
+            echo "## Overlay verification"
+            echo ""
+            echo "Each overlay is rendered with \`kustomize build --enable-helm\` and"
+            echo "schema-validated with \`kubeconform\`."
+            echo ""
+            echo "| Overlay | Result |"
+            echo "|---------|--------|"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          for env in base dev prod staging; do
+            echo "==> $env"
+            out=$(kustomize build "overlays/$env" \
+              --enable-helm --load-restrictor=LoadRestrictionsNone \
+              | kubeconform -summary)
+            echo "$out"
+            echo "| $env | \`$out\` |" >> "${GITHUB_STEP_SUMMARY}"
+          done

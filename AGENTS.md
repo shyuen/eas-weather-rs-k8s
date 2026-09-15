@@ -73,8 +73,21 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - `--load-restrictor=LoadRestrictionsNone` is **required** for kustomize builds because
   `chartHome` points outside each overlay's root.
 - Image: both `server` and `migrate` binaries live in the same image
-  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). Image tag is the environment marker
-  (`latest` / `dev` / `prod`).
+  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). The app repo's `ci.yml` `publish` job (runs
+  on main push; also `workflow_dispatch`) publishes a floating `<env>` tag plus a versioned
+  `<env>-<sha>` tag, tags the codebase repo, then clones THIS repo with a PAT
+  (`secrets.EWRS_DEPLOY_REPO_PAT`), sets `valuesInline.image.tag` in the target overlay with
+  `yq`, and pushes the change to `main`. The static markers in the overlays (`dev` /
+  `staging` / `prod`) are the initial/default values until the first publish.
+- **Deployment is ArgoCD's job, not this repo's.** There is deliberately no `kubectl
+  apply`/deploy workflow here. ArgoCD watches this repo's `main` and syncs the target overlay
+  (installed out-of-band, e.g. with the kustomize/helm render settings this repo requires).
+  Keeping `main` green (`helm lint` + `kustomize build`) is all that's needed for a release;
+  `.github/workflows/verify.yaml` enforces that on every push/PR. Because the app repo pushes
+  tag bumps straight to `main`, the verify workflow is the safety net for those changes.
+- Config-only changes need no pipeline: editing `valuesInline` (or the chart) here is applied
+  by ArgoCD directly — the app repo's CI is only involved when a new image tag is published.
+  The `checksum/config` annotation makes config changes roll the pods.
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.
@@ -91,8 +104,7 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
   Set `reloader.enabled` to also render `reloader.stakater.com/auto` for secret-value rotation (Reloader must
   be installed cluster-wide, out-of-band).
 - New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/staging`, set the
-  namespace and `valuesInline`. The image tag must exist as an environment marker (`dev` / `staging` /
-  `prod`) in the app's container registry - build the tag in CI before deploying that environment.
+  namespace and `valuesInline`.
 
 ### Helm values vs Kustomize features (where env differences go)
 
