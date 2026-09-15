@@ -24,12 +24,19 @@ jobs:
         uses: imranismail/setup-kustomize@v2
         with:
           kustomize-version: v5.4.3
+      - name: Install kubeconform
+        run: |
+          curl -sSLo /tmp/kubeconform.tar.gz \
+            https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
       - name: Helm lint
         run: helm lint charts/eas-weather-rs
-      - name: Render the chart for every overlay
+      - name: Render and schema-validate the chart for every overlay
         run: |
           for env in base dev prod staging; do
             echo "==> $env"
             kustomize build "overlays/$env" \
-              --enable-helm --load-restrictor=LoadRestrictionsNone
+              --enable-helm --load-restrictor=LoadRestrictionsNone \
+              | kubeconform -summary
           done
