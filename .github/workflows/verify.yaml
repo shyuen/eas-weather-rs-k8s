@@ -34,9 +34,20 @@ jobs:
         run: helm lint charts/eas-weather-rs
       - name: Render and schema-validate the chart for every overlay
         run: |
+          {
+            echo "## Overlay verification"
+            echo ""
+            echo "Each overlay is rendered with \`kustomize build --enable-helm\` and"
+            echo "schema-validated with \`kubeconform\`."
+            echo ""
+            echo "| Overlay | Result |"
+            echo "|---------|--------|"
+          } >> "${GITHUB_STEP_SUMMARY}"
           for env in base dev prod staging; do
             echo "==> $env"
-            kustomize build "overlays/$env" \
+            out=$(kustomize build "overlays/$env" \
               --enable-helm --load-restrictor=LoadRestrictionsNone \
-              | kubeconform -summary
+              | kubeconform -summary)
+            echo "$out"
+            echo "| $env | \`$out\` |" >> "${GITHUB_STEP_SUMMARY}"
           done
