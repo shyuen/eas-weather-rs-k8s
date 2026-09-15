@@ -85,6 +85,9 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
   Keeping `main` green (`helm lint` + `kustomize build`) is all that's needed for a release;
   `.github/workflows/verify.yaml` enforces that on every push/PR. Because the app repo pushes
   tag bumps straight to `main`, the verify workflow is the safety net for those changes.
+- Config-only changes need no pipeline: editing `valuesInline` (or the chart) here is applied
+  by ArgoCD directly — the app repo's CI is only involved when a new image tag is published.
+  The `checksum/config` annotation makes config changes roll the pods.
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.

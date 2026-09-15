@@ -58,6 +58,11 @@ there is deliberately no `kubectl apply`/deploy workflow here. `.github/workflow
 runs `helm lint` + a full `kustomize build` of every overlay on each push/PR to keep `main`
 green for ArgoCD.
 
+Config-only changes need no pipeline: edit `valuesInline` (env vars, replicas, probes, ...)
+in an overlay, push — verify.yaml renders it, ArgoCD applies it, and the `checksum/config`
+annotation on the pod template rolls the workload. The app repo's CI is only involved when a
+new image tag is being published.
+
 ## Customising an environment
 
 Environment differences (image tag, replicas, logging, ingress, resources) are
