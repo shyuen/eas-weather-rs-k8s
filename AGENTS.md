@@ -73,8 +73,13 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - `--load-restrictor=LoadRestrictionsNone` is **required** for kustomize builds because
   `chartHome` points outside each overlay's root.
 - Image: both `server` and `migrate` binaries live in the same image
-  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). Image tag is the environment marker
-  (`latest` / `dev` / `prod`).
+  (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). The CD pipeline in the app repo
+  (`.github/workflows/cd.yml`, `workflow_dispatch`) publishes a floating `<env>` tag plus a
+  versioned `<env>-<sha>` tag, then dispatches here so `.github/workflows/bump-image.yaml`
+  overwrites `overlays/<env>/kustomization.yaml` `valuesInline.image.tag` with the versioned
+  tag and pushes to main. The static markers in the overlays (`dev` / `staging` / `prod`) are
+  the initial/default values until the first CD bump. The dispatch requires a PAT with `repo`
+  scope in the app repo (`secrets.EWRS_DEPLOY_REPO_PAT`).
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.
@@ -91,8 +96,7 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
   Set `reloader.enabled` to also render `reloader.stakater.com/auto` for secret-value rotation (Reloader must
   be installed cluster-wide, out-of-band).
 - New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/staging`, set the
-  namespace and `valuesInline`. The image tag must exist as an environment marker (`dev` / `staging` /
-  `prod`) in the app's container registry - build the tag in CI before deploying that environment.
+  namespace and `valuesInline`.
 
 ### Helm values vs Kustomize features (where env differences go)
 

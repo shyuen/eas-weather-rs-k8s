@@ -44,6 +44,15 @@ kustomize build overlays/prod --enable-helm --load-restrictor=LoadRestrictionsNo
 `--load-restrictor=LoadRestrictionsNone` is required because `helmCharts.chartHome`
 points at the shared `charts/` directory outside each overlay's root.
 
+## Continuous deployment (image bumps)
+
+The app repo's CD workflow (`.github/workflows/cd.yml`, `workflow_dispatch`) builds the
+image, publishes `<env>` + `<env>-<sha>` tags to GHCR, and dispatches a `deploy` event to
+this repo. `.github/workflows/bump-image.yaml` then rewrites the target overlay's
+`valuesInline.image.tag` and pushes to `main`. The static tags in `overlays/*` (`dev`,
+`staging`, `prod`) are the initial values until the first CD bump. The app repo needs a PAT
+with `repo` scope (`secrets.EWRS_DEPLOY_REPO_PAT`) to send the dispatch.
+
 ## Customising an environment
 
 Environment differences (image tag, replicas, logging, ingress, resources) are
