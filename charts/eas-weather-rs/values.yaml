@@ -103,6 +103,13 @@ probes:
     timeoutSeconds: 1
     failureThreshold: 3
 
+# Reloader (stakater) restarts pods when the mounted Secret or ConfigMap contents change
+# in-cluster, covering secret-value rotation that the checksum/config annotation can't
+# see (the Secret is created out-of-band, so its values are unknown at render time).
+# Install Reloader cluster-wide separately; enable this only in clusters that have it.
+reloader:
+  enabled: false
+
 resources: {}
 
 extraEnv: []
