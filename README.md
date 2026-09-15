@@ -11,6 +11,7 @@ charts/eas-weather-rs/   Helm chart (Deployment: migrate init-container + server
 overlays/
   base/                  Reference deployment (default values, default namespace)
   dev/                   Development overlay (tag: dev, debug logging, 1 replica)
+  staging/               Staging overlay (tag: staging, JSON logging, 2 replicas, resources)
   prod/                  Production overlay (tag: prod, JSON logging, 2 replicas, ingress, resources)
 ```
 

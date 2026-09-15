@@ -22,6 +22,8 @@ charts/eas-weather-rs/
 overlays/
   base/                 Reference deployment (tags: latest, default namespace)
   dev/                  ns eas-weather-rs-dev, tag: dev, debug logging, 1 replica
+  staging/              ns eas-weather-rs-staging, tag: staging, JSON logging, 2 replicas,
+                        resource requests/limits (pre-prod shape, no ingress)
   prod/                 ns eas-weather-rs-prod, tag: prod, JSON logging, 2 replicas,
                         ingress + cert-manager annotation, resource requests/limits
 ```
@@ -84,8 +86,9 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - Health probes are configured via `values.yaml` `probes:` (startup/liveness/readiness, one route each);
   their `path` is composed under `config.webserver.base_path` in `deployment.yaml`. The app's `/health/*`
   routes require no API key.
-- New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/dev`, set the
-  namespace and `valuesInline`.
+- New environments: add an `overlays/<env>/kustomization.yaml` mirroring `overlays/staging`, set the
+  namespace and `valuesInline`. The image tag must exist as an environment marker (`dev` / `staging` /
+  `prod`) in the app's container registry - build the tag in CI before deploying that environment.
 
 ### Helm values vs Kustomize features (where env differences go)
 
