@@ -14,4 +14,4 @@ helmCharts:
       replicaCount: 1
       config:
         logging:
-          traceLevel: debug
+          trace_level: debug

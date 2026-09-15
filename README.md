@@ -7,7 +7,7 @@ EAS alert microservice, using a combination of **Helm** (app templating) and
 ## Layout
 
 ```
-charts/eas-weather-rs/   Helm chart (Deployment, init-container migrate, Service, Ingress)
+charts/eas-weather-rs/   Helm chart (Deployment: migrate init-container + server, ConfigMap, Service, Ingress)
 overlays/
   base/                  Reference deployment (default values, default namespace)
   dev/                   Development overlay (tag: dev, debug logging, 1 replica)
