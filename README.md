@@ -47,14 +47,16 @@ points at the shared `charts/` directory outside each overlay's root.
 ## Image bumps and deployment
 
 The app repo's `ci.yml` `publish` job (runs on main push; also `workflow_dispatch`) builds
-the image, publishes `<env>` + `<env>-<sha>` tags to GHCR, and dispatches a `deploy` event to
-this repo. `.github/workflows/bump-image.yaml` then rewrites the target overlay's
-`valuesInline.image.tag` and pushes to `main`. The static tags in `overlays/*` (`dev`,
-`staging`, `prod`) are the initial values until the first bump. The app repo needs a PAT with
-`repo` scope (`secrets.EWRS_DEPLOY_REPO_PAT`) to send the dispatch.
+the image, publishes `<env>` + `<env>-<sha>` tags to GHCR and tags the codebase repo, then
+clones this repo with a PAT (`secrets.EWRS_DEPLOY_REPO_PAT` — `repo` scope), yq-updates
+`overlays/<env>/kustomization.yaml` `valuesInline.image.tag`, and pushes to `main`. The
+static tags in `overlays/*` (`dev`, `staging`, `prod`) are the initial values until the
+first publish.
 
-Actual deployment is ArgoCD's job: it watches this repo's `main` and syncs the target
-overlay, so there is deliberately no `kubectl apply`/deploy workflow in this repo.
+Deployment is ArgoCD's job: it watches this repo's `main` and syncs the target overlay, so
+there is deliberately no `kubectl apply`/deploy workflow here. `.github/workflows/verify.yaml`
+runs `helm lint` + a full `kustomize build` of every overlay on each push/PR to keep `main`
+green for ArgoCD.
 
 ## Customising an environment
 

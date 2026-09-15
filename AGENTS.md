@@ -75,15 +75,16 @@ helm template eas-weather-rs charts/eas-weather-rs -n eas-weather-rs-dev \
 - Image: both `server` and `migrate` binaries live in the same image
   (`ghcr.io/shyuen/eas-weather-rs-server:<tag>`). The app repo's `ci.yml` `publish` job (runs
   on main push; also `workflow_dispatch`) publishes a floating `<env>` tag plus a versioned
-  `<env>-<sha>` tag, then dispatches here so `.github/workflows/bump-image.yaml` overwrites
-  `overlays/<env>/kustomization.yaml` `valuesInline.image.tag` with the versioned tag and
-  pushes to main. The static markers in the overlays (`dev` / `staging` / `prod`) are the
-  initial/default values until the first CD bump. The dispatch requires a PAT with `repo`
-  scope in the app repo (`secrets.EWRS_DEPLOY_REPO_PAT`).
+  `<env>-<sha>` tag, tags the codebase repo, then clones THIS repo with a PAT
+  (`secrets.EWRS_DEPLOY_REPO_PAT`), sets `valuesInline.image.tag` in the target overlay with
+  `yq`, and pushes the change to `main`. The static markers in the overlays (`dev` /
+  `staging` / `prod`) are the initial/default values until the first publish.
 - **Deployment is ArgoCD's job, not this repo's.** There is deliberately no `kubectl
   apply`/deploy workflow here. ArgoCD watches this repo's `main` and syncs the target overlay
   (installed out-of-band, e.g. with the kustomize/helm render settings this repo requires).
-  Keeping `main` green (`helm lint` + `kustomize build`) is all that's needed for a release.
+  Keeping `main` green (`helm lint` + `kustomize build`) is all that's needed for a release;
+  `.github/workflows/verify.yaml` enforces that on every push/PR. Because the app repo pushes
+  tag bumps straight to `main`, the verify workflow is the safety net for those changes.
 - Bump `version`/`appVersion` in `Chart.yaml` when the deployment template materially changes.
 - Deployment image helper: `{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}`.
   Prefer setting `image.tag` explicitly in the overlay over relying on the AppVersion default.
