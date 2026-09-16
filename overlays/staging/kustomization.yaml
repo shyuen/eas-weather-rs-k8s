@@ -10,7 +10,7 @@ helmCharts:
     valuesInline:
       image:
         repository: ghcr.io/shyuen/eas-weather-rs-server
-        tag: staging
+        tag: b86d29e-d183.23.2
       replicaCount: 2
       config:
         logging:
